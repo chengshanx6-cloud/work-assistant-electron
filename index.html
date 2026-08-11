@@ -80,7 +80,7 @@
     .field { min-width: 0; }
     .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
     .input-wrap { position: relative; }
-    input[type="number"], input[type="time"] {
+    input[type="number"], input[type="time"], input[type="text"] {
       width: 100%; height: 38px; padding: 0 11px;
       border: 1px solid var(--border); border-radius: 7px;
       outline: none; background: var(--panel-2); color: var(--text);
@@ -121,6 +121,15 @@
     .result.primary { border-color: #215c54; background: #10211f; }
     .result.primary .value { color: var(--green); }
     .formula-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .stat { padding: 15px; border: 1px solid #1e2935; border-radius: 8px; background: var(--panel-2); }
+    .stat .value { margin-top: 6px; font: 650 22px Consolas, monospace; color: var(--cyan); }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid #1d2732; }
+    .setting-row:first-of-type { padding-top: 0; }
+    .setting-row:last-of-type { border-bottom: 0; padding-bottom: 0; }
+    .setting-name { font-weight: 600; }
+    .setting-note { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .pause-badge { margin-top: 12px; color: var(--orange); font: 12px Consolas, monospace; }
     .disabled-module > :not(.card-head) { opacity: .43; pointer-events: none; }
     .footer { margin-top: 17px; text-align: center; color: #5f6b79; font-size: 11px; }
 
@@ -128,6 +137,7 @@
       .card, .card.wide { grid-column: span 6; }
       .salary-inputs { grid-template-columns: repeat(2, 1fr); }
       .results { grid-template-columns: repeat(3, 1fr); }
+      .stats { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -194,6 +204,39 @@
         </div>
       </article>
 
+      <article class="card" id="paydayCard">
+        <div class="card-head">
+          <div><h2 class="card-title">发薪日倒计时</h2><p class="card-desc">期待下一次工资到账</p></div>
+          <label class="switch"><input id="paydayEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="field"><label for="payday">每月发薪日</label><div class="input-wrap"><input id="payday" type="number" min="1" max="31"><span class="suffix">日</span></div></div>
+        <div class="metric" style="margin-top:16px"><div class="metric-label">距离发工资</div><div class="metric-value" id="paydayCountdown">-- 天</div><div class="metric-note" id="paydayNote">等待配置</div></div>
+      </article>
+
+      <article class="card wide" id="statisticsCard">
+        <div class="card-head">
+          <div><h2 class="card-title">工作统计</h2><p class="card-desc">按照工作日历与上班时段实时汇总</p></div>
+          <label class="switch"><input id="statisticsEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="metric-label">今日预计收益</div><div class="value" id="todayStatEarnings">¥0.00</div></div>
+          <div class="stat"><div class="metric-label">本月预计收益</div><div class="value" id="monthStatEarnings">¥0.00</div></div>
+          <div class="stat"><div class="metric-label">今日计薪时长</div><div class="value" id="todayStatHours">0.0 h</div></div>
+          <div class="stat"><div class="metric-label">本月提醒次数</div><div class="value" id="monthReminderCount">0</div></div>
+        </div>
+      </article>
+
+      <article class="card" id="systemCard">
+        <div class="card-head"><div><h2 class="card-title">系统与工作日</h2><p class="card-desc">Windows 集成及单位特殊日历</p></div></div>
+        <div class="setting-row">
+          <div><div class="setting-name">开机自动启动</div><div class="setting-note">登录 Windows 后自动进入托盘</div></div>
+          <label class="switch"><input id="autoLaunchEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="field" style="margin-top:13px"><label for="customHolidays">自定义休息日（逗号分隔）</label><input id="customHolidays" type="text" placeholder="2026-08-12, 2026-08-13"></div>
+        <div class="field" style="margin-top:11px"><label for="customWorkdays">自定义补班日（逗号分隔）</label><input id="customWorkdays" type="text" placeholder="2026-08-15"></div>
+        <div class="pause-badge" id="pauseStatus">全部提醒正常运行</div>
+      </article>
+
       <article class="card full" id="salaryCard">
         <div class="card-head">
           <div><h2 class="card-title">薪资计算器</h2><p class="card-desc">中国大陆居民工资薪金月度预扣估算</p></div>
@@ -234,6 +277,9 @@
       countdownEnabled: true,
       earningsEnabled: true,
       salaryEnabled: true,
+      paydayEnabled: true,
+      statisticsEnabled: true,
+      autoLaunchEnabled: false,
       lunchStart: '12:00',
       lunchEnd: '13:30',
       workStart: '09:00',
@@ -245,22 +291,46 @@
       expectedDays: 22,
       actualDays: 22,
       monthlyAllowance: 0,
-      reminderNextAt: { sedentary: 0, water: 0 }
+      payday: 10,
+      customHolidays: '',
+      customWorkdays: '',
+      reminderNextAt: { sedentary: 0, water: 0 },
+      pauseUntil: 0,
+      reminderHistory: {}
     };
 
     const ids = [
       'sedentaryEnabled', 'sedentaryInterval', 'waterEnabled', 'waterInterval',
-      'countdownEnabled', 'earningsEnabled', 'salaryEnabled', 'lunchStart', 'lunchEnd',
+      'countdownEnabled', 'earningsEnabled', 'salaryEnabled', 'paydayEnabled', 'statisticsEnabled',
+      'autoLaunchEnabled', 'lunchStart', 'lunchEnd', 'payday', 'customHolidays', 'customWorkdays',
       'workStart', 'workEnd', 'monthlySalary', 'fundBase', 'fundRate', 'socialSecurity',
       'expectedDays', 'actualDays', 'monthlyAllowance'
     ];
-    const checkboxIds = new Set(['sedentaryEnabled', 'waterEnabled', 'countdownEnabled', 'earningsEnabled', 'salaryEnabled']);
+    const checkboxIds = new Set(['sedentaryEnabled', 'waterEnabled', 'countdownEnabled', 'earningsEnabled', 'salaryEnabled', 'paydayEnabled', 'statisticsEnabled', 'autoLaunchEnabled']);
+    const builtinHolidays = new Set([
+      '2025-01-01', '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02', '2025-02-03', '2025-02-04',
+      '2025-04-04', '2025-04-05', '2025-04-06', '2025-05-01', '2025-05-02', '2025-05-03', '2025-05-04', '2025-05-05',
+      '2025-05-31', '2025-06-01', '2025-06-02', '2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05', '2025-10-06', '2025-10-07', '2025-10-08',
+      '2026-01-01', '2026-01-02', '2026-01-03', '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23',
+      '2026-04-04', '2026-04-05', '2026-04-06', '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05',
+      '2026-06-19', '2026-06-20', '2026-06-21', '2026-09-25', '2026-09-26', '2026-09-27',
+      '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'
+    ]);
+    const builtinWorkdays = new Set([
+      '2025-01-26', '2025-02-08', '2025-04-27', '2025-05-10', '2025-09-28', '2025-10-11',
+      '2026-01-04', '2026-02-14', '2026-02-28', '2026-04-26', '2026-05-09', '2026-09-20', '2026-10-10'
+    ]);
     let config = loadConfig();
 
     function loadConfig() {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        return { ...defaults, ...saved, reminderNextAt: { ...defaults.reminderNextAt, ...(saved.reminderNextAt || {}) } };
+        return {
+          ...defaults,
+          ...saved,
+          reminderNextAt: { ...defaults.reminderNextAt, ...(saved.reminderNextAt || {}) },
+          reminderHistory: saved.reminderHistory && typeof saved.reminderHistory === 'object' ? saved.reminderHistory : {}
+        };
       } catch (_error) {
         return { ...defaults, reminderNextAt: { ...defaults.reminderNextAt } };
       }
@@ -299,6 +369,17 @@
       return match ? { hour: Number(match[1]), minute: Number(match[2]) } : null;
     }
 
+    function dateKey(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function configuredDates(value) {
+      return new Set(String(value || '').split(/[，,;；\s]+/).filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item)));
+    }
+
     function atTime(now, value) {
       const parts = timeParts(value);
       if (!parts) return null;
@@ -316,6 +397,13 @@
     }
 
     function isWorkday(date) {
+      const key = dateKey(date);
+      const customWorkdays = configuredDates(config.customWorkdays);
+      const customHolidays = configuredDates(config.customHolidays);
+      if (customWorkdays.has(key)) return true;
+      if (customHolidays.has(key)) return false;
+      if (builtinWorkdays.has(key)) return true;
+      if (builtinHolidays.has(key)) return false;
       const day = date.getDay();
       return day >= 1 && day <= 5;
     }
@@ -393,7 +481,7 @@
 
       const inActiveSegment = isWorkday(now) && segments.some(([start, end]) => now >= start && now < end);
       state.classList.toggle('active', inActiveSegment);
-      if (!isWorkday(now)) state.textContent = '今天是周末，收益暂停';
+      if (!isWorkday(now)) state.textContent = '今天是休息日，收益暂停';
       else if (!segments.length) state.textContent = '请检查上班与午休时间配置';
       else if (inActiveSegment) state.textContent = `正在累计 · ${currency(result.hourly)}/小时`;
       else if (now < segments[0][0]) state.textContent = '尚未到上班时间';
@@ -419,7 +507,7 @@
 
       if (!isWorkday(now)) {
         lunchValue.textContent = workValue.textContent = '--:--:--';
-        lunchNote.textContent = workNote.textContent = '今天是周末';
+        lunchNote.textContent = workNote.textContent = '今天是休息日';
       } else {
         if (now < lunchStart) {
           lunchValue.textContent = duration(lunchStart - now);
@@ -440,6 +528,69 @@
           workNote.textContent = '今天辛苦了，已下班';
         }
       }
+    }
+
+    function updatePayday(now) {
+      const value = document.getElementById('paydayCountdown');
+      const note = document.getElementById('paydayNote');
+      if (!config.paydayEnabled) {
+        value.textContent = '-- 天';
+        note.textContent = '模块未启用';
+        return;
+      }
+
+      const requestedDay = Math.min(31, Math.max(1, Math.floor(numberValue('payday') || 1)));
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const paydayFor = (year, month) => {
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        return new Date(year, month, Math.min(requestedDay, lastDay));
+      };
+      let target = paydayFor(now.getFullYear(), now.getMonth());
+      if (today > target) target = paydayFor(now.getFullYear(), now.getMonth() + 1);
+      const days = Math.round((target - today) / 86400000);
+      value.textContent = days === 0 ? '就是今天' : `${days} 天`;
+      note.textContent = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')} · 预计到手 ${currency(salaryResults().net)}`;
+    }
+
+    function elapsedWorkMs(date, now) {
+      if (!isWorkday(date)) return 0;
+      const segments = workSegments(date);
+      const isToday = dateKey(date) === dateKey(now);
+      return segments.reduce((sum, [start, end]) => {
+        if (!isToday) return sum + (end - start);
+        return sum + Math.max(0, Math.min(now, end) - start);
+      }, 0);
+    }
+
+    function updateStatistics(now) {
+      if (!config.statisticsEnabled) {
+        document.getElementById('todayStatEarnings').textContent = '¥0.00';
+        document.getElementById('monthStatEarnings').textContent = '¥0.00';
+        document.getElementById('todayStatHours').textContent = '0.0 h';
+        document.getElementById('monthReminderCount').textContent = '0';
+        return;
+      }
+
+      const hourly = salaryResults().hourly;
+      const todayMs = elapsedWorkMs(now, now);
+      let monthMs = 0;
+      for (let day = 1; day <= now.getDate(); day += 1) {
+        monthMs += elapsedWorkMs(new Date(now.getFullYear(), now.getMonth(), day), now);
+      }
+      const monthPrefix = dateKey(now).slice(0, 7);
+      const reminderCount = Object.entries(config.reminderHistory || {})
+        .filter(([key]) => key.startsWith(monthPrefix))
+        .reduce((sum, [, count]) => sum + (Number(count) || 0), 0);
+      document.getElementById('todayStatEarnings').textContent = currency(hourly * todayMs / 3600000);
+      document.getElementById('monthStatEarnings').textContent = currency(hourly * monthMs / 3600000);
+      document.getElementById('todayStatHours').textContent = `${(todayMs / 3600000).toFixed(1)} h`;
+      document.getElementById('monthReminderCount').textContent = String(reminderCount);
+    }
+
+    function updatePauseStatus(now) {
+      const target = document.getElementById('pauseStatus');
+      if (config.pauseUntil > now.getTime()) target.textContent = `全部提醒已暂停 · 剩余 ${duration(config.pauseUntil - now.getTime())}`;
+      else target.textContent = '全部提醒正常运行';
     }
 
     function reminderPayload() {
@@ -481,16 +632,21 @@
       document.getElementById('countdownCard').classList.toggle('disabled-module', !config.countdownEnabled);
       document.getElementById('earningsCard').classList.toggle('disabled-module', !config.earningsEnabled);
       document.getElementById('salaryCard').classList.toggle('disabled-module', !config.salaryEnabled);
+      document.getElementById('paydayCard').classList.toggle('disabled-module', !config.paydayEnabled);
+      document.getElementById('statisticsCard').classList.toggle('disabled-module', !config.statisticsEnabled);
     }
 
     function refresh() {
       const now = new Date();
       document.getElementById('todayText').textContent = now.toLocaleDateString('zh-CN', {
         year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
-      }) + (isWorkday(now) ? ' · 工作日' : ' · 周末');
+      }) + (isWorkday(now) ? ' · 工作日' : ' · 休息日');
       calculateSalary();
       updateCountdowns(now);
       updateEarnings(now);
+      updatePayday(now);
+      updateStatistics(now);
+      updatePauseStatus(now);
       updateReminderLabels(now);
       updateModuleStates();
     }
@@ -500,6 +656,13 @@
       readForm();
       if (id === 'sedentaryEnabled' || id === 'sedentaryInterval') resetReminder('sedentary');
       if (id === 'waterEnabled' || id === 'waterInterval') resetReminder('water');
+      if (id === 'autoLaunchEnabled') {
+        ipcRenderer.invoke('set-auto-launch', config.autoLaunchEnabled).then((enabled) => {
+          config.autoLaunchEnabled = Boolean(enabled);
+          document.getElementById('autoLaunchEnabled').checked = config.autoLaunchEnabled;
+          saveConfig();
+        });
+      }
       saveConfig();
       refresh();
     }
@@ -513,12 +676,35 @@
     if (config.sedentaryEnabled && !config.reminderNextAt.sedentary) resetReminder('sedentary');
     if (config.waterEnabled && !config.reminderNextAt.water) resetReminder('water');
     ipcRenderer.send('set-reminder-state', reminderPayload());
+    ipcRenderer.send('set-reminder-pause', config.pauseUntil);
+
+    ipcRenderer.invoke('get-auto-launch').then((enabled) => {
+      config.autoLaunchEnabled = Boolean(enabled);
+      document.getElementById('autoLaunchEnabled').checked = config.autoLaunchEnabled;
+      saveConfig();
+    });
 
     ipcRenderer.on('reminder-state-updated', (_event, state) => {
       config.reminderNextAt.sedentary = state.sedentary.nextAt;
       config.reminderNextAt.water = state.water.nextAt;
       saveConfig();
       updateReminderLabels(new Date());
+    });
+
+    ipcRenderer.on('reminder-pause-updated', (_event, value) => {
+      config.pauseUntil = Number(value) || 0;
+      saveConfig();
+      updatePauseStatus(new Date());
+    });
+
+    ipcRenderer.on('reminder-fired', () => {
+      const key = dateKey(new Date());
+      config.reminderHistory[key] = (Number(config.reminderHistory[key]) || 0) + 1;
+      saveConfig();
+    });
+
+    ipcRenderer.on('focus-earnings', () => {
+      document.getElementById('earningsCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     refresh();

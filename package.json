@@ -1,6 +1,6 @@
 {
   "name": "workday-companion",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Windows desktop workday companion with reminders, countdowns and salary calculation.",
   "main": "main.js",
   "author": "Local User",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.local.workdaycompanion",
-    "productName": "Workday Companion",
+    "productName": "工作助手",
     "asar": true,
     "files": [
       "main.js",
@@ -42,7 +42,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Workday Companion"
+      "shortcutName": "工作助手"
     }
   }
 }

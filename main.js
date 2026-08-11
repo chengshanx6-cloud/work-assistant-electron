@@ -6,6 +6,7 @@ let tray = null;
 let isQuitting = false;
 let reminderState = null;
 let scheduler = null;
+let pauseUntil = 0;
 
 function createTrayIcon() {
   const size = 16;
@@ -75,9 +76,24 @@ function createWindow() {
 
 function createTray() {
   tray = new Tray(createTrayIcon());
-  tray.setToolTip('Workday Companion');
+  tray.setToolTip('工作助手');
+  updateTrayMenu();
+  tray.on('double-click', showWindow);
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const paused = pauseUntil > Date.now();
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开主窗口', click: showWindow },
+    { label: '查看今日收益', click: () => {
+      showWindow();
+      mainWindow.webContents.send('focus-earnings');
+    } },
+    { type: 'separator' },
+    paused
+      ? { label: '恢复全部提醒', click: () => setReminderPause(0) }
+      : { label: '暂停全部提醒 1 小时', click: () => setReminderPause(Date.now() + 60 * 60 * 1000) },
     { type: 'separator' },
     {
       label: '退出程序',
@@ -87,7 +103,14 @@ function createTray() {
       }
     }
   ]));
-  tray.on('double-click', showWindow);
+}
+
+function setReminderPause(value) {
+  pauseUntil = Math.max(0, Number(value) || 0);
+  updateTrayMenu();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('reminder-pause-updated', pauseUntil);
+  }
 }
 
 function normalizeReminderState(value) {
@@ -116,6 +139,9 @@ function checkReminders() {
   const now = Date.now();
   let changed = false;
 
+  if (pauseUntil > now) return;
+  if (pauseUntil) setReminderPause(0);
+
   [
     ['sedentary', '久坐提醒', '坐得有点久了，起来走动和拉伸一下吧。'],
     ['water', '喝水提醒', '该喝水了，补充一点水分再继续工作。']
@@ -134,6 +160,9 @@ function checkReminders() {
       notify(title, body);
       item.nextAt = now + intervalMs;
       changed = true;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('reminder-fired', key);
+      }
     }
   });
 
@@ -160,6 +189,21 @@ if (!gotLock) {
 
 ipcMain.on('set-reminder-state', (_event, state) => {
   reminderState = normalizeReminderState(state);
+});
+
+ipcMain.on('set-reminder-pause', (_event, value) => {
+  setReminderPause(value);
+});
+
+ipcMain.handle('get-auto-launch', () => app.getLoginItemSettings().openAtLogin);
+
+ipcMain.handle('set-auto-launch', (_event, enabled) => {
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    path: process.execPath,
+    args: app.isPackaged ? [] : [path.resolve(process.argv[1] || '.')]
+  });
+  return app.getLoginItemSettings().openAtLogin;
 });
 
 ipcMain.handle('show-test-notification', (_event, type) => {
