@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workday Companion</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f14;
+      --panel: #111821;
+      --panel-2: #0d131b;
+      --border: #24303d;
+      --text: #e6edf3;
+      --muted: #8491a1;
+      --cyan: #4fd1c5;
+      --blue: #58a6ff;
+      --green: #56d364;
+      --orange: #e3b341;
+      --red: #ff7b72;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .app { max-width: 1440px; margin: 0 auto; padding: 24px; }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .brand h1 { margin: 0; font: 650 22px/1.2 Consolas, monospace; letter-spacing: -.4px; }
+    .brand p { margin: 6px 0 0; color: var(--muted); }
+    .status {
+      padding: 7px 11px;
+      border: 1px solid #215c54;
+      border-radius: 999px;
+      color: var(--cyan);
+      background: #102721;
+      font-size: 12px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      grid-column: span 4;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 10px 25px rgba(0,0,0,.12);
+    }
+    .card.wide { grid-column: span 8; }
+    .card.full { grid-column: 1 / -1; }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .card-title { margin: 0; font-size: 16px; font-weight: 650; }
+    .card-desc { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+    .switch { position: relative; width: 42px; height: 24px; flex: 0 0 auto; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; border-radius: 24px; background: #303b47; transition: .2s; }
+    .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #b1bbc7; transition: .2s; }
+    .switch input:checked + .slider { background: #176c64; }
+    .switch input:checked + .slider::before { transform: translateX(18px); background: #d8fffb; }
+
+    .field { min-width: 0; }
+    .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+    .input-wrap { position: relative; }
+    input[type="number"], input[type="time"] {
+      width: 100%; height: 38px; padding: 0 11px;
+      border: 1px solid var(--border); border-radius: 7px;
+      outline: none; background: var(--panel-2); color: var(--text);
+    }
+    input[type="number"] { padding-right: 46px; }
+    input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(88,166,255,.12); }
+    input:disabled { opacity: .5; cursor: not-allowed; }
+    .suffix { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 12px; pointer-events: none; }
+
+    .reminder-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+    .button {
+      height: 38px; padding: 0 13px; border: 1px solid var(--border); border-radius: 7px;
+      background: #17212c; color: var(--text);
+    }
+    .button:hover { border-color: #3c4b5c; background: #1b2835; }
+    .next { margin-top: 13px; color: var(--muted); font: 12px Consolas, monospace; }
+    .next strong { color: var(--cyan); font-weight: 500; }
+
+    .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .countdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .metric { padding: 14px; border-radius: 8px; background: var(--panel-2); border: 1px solid #1e2935; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric-value { margin-top: 6px; font: 600 21px Consolas, monospace; color: var(--blue); }
+    .metric-note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+
+    .earnings { display: flex; height: 100%; min-height: 155px; flex-direction: column; justify-content: center; }
+    .money { font: 700 36px Consolas, monospace; color: var(--green); letter-spacing: -1px; }
+    .earning-state { margin-top: 8px; color: var(--muted); }
+    .earning-state.active { color: var(--green); }
+    .progress { height: 5px; margin-top: 17px; overflow: hidden; border-radius: 5px; background: #252f3a; }
+    .progress > span { display: block; width: 0; height: 100%; background: var(--green); transition: width .5s; }
+
+    .salary-inputs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
+    .results { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 18px; }
+    .result { min-width: 0; padding: 12px; border: 1px solid #1e2935; border-radius: 8px; background: var(--panel-2); }
+    .result .name { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .result .value { margin-top: 5px; overflow: hidden; text-overflow: ellipsis; font: 600 16px Consolas, monospace; }
+    .result.primary { border-color: #215c54; background: #10211f; }
+    .result.primary .value { color: var(--green); }
+    .formula-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+    .disabled-module > :not(.card-head) { opacity: .43; pointer-events: none; }
+    .footer { margin-top: 17px; text-align: center; color: #5f6b79; font-size: 11px; }
+
+    @media (max-width: 1080px) {
+      .card, .card.wide { grid-column: span 6; }
+      .salary-inputs { grid-template-columns: repeat(2, 1fr); }
+      .results { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <h1>&gt; Workday Companion_</h1>
+        <p id="todayText">加载当前日期...</p>
+      </div>
+      <div class="status">● 托盘后台运行中</div>
+    </header>
+
+    <section class="dashboard">
+      <article class="card" id="sedentaryCard">
+        <div class="card-head">
+          <div><h2 class="card-title">久坐计时器</h2><p class="card-desc">周期提醒起身活动</p></div>
+          <label class="switch"><input id="sedentaryEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="reminder-row">
+          <div class="field"><label for="sedentaryInterval">提醒间隔</label><div class="input-wrap"><input id="sedentaryInterval" type="number" min="1" max="1440"><span class="suffix">分钟</span></div></div>
+          <button class="button" data-test="sedentary">测试通知</button>
+        </div>
+        <div class="next">下次提醒：<strong id="sedentaryNext">未启用</strong></div>
+      </article>
+
+      <article class="card" id="waterCard">
+        <div class="card-head">
+          <div><h2 class="card-title">喝水计时器</h2><p class="card-desc">保持规律补充水分</p></div>
+          <label class="switch"><input id="waterEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="reminder-row">
+          <div class="field"><label for="waterInterval">提醒间隔</label><div class="input-wrap"><input id="waterInterval" type="number" min="1" max="1440"><span class="suffix">分钟</span></div></div>
+          <button class="button" data-test="water">测试通知</button>
+        </div>
+        <div class="next">下次提醒：<strong id="waterNext">未启用</strong></div>
+      </article>
+
+      <article class="card" id="earningsCard">
+        <div class="card-head">
+          <div><h2 class="card-title">实时时薪收益</h2><p class="card-desc">仅工作日和上班时段累计</p></div>
+          <label class="switch"><input id="earningsEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="earnings">
+          <div class="money" id="earnedMoney">¥0.00</div>
+          <div class="earning-state" id="earningState">模块未启用</div>
+          <div class="progress"><span id="earningProgress"></span></div>
+        </div>
+      </article>
+
+      <article class="card wide" id="countdownCard">
+        <div class="card-head">
+          <div><h2 class="card-title">午休 &amp; 下班倒计时</h2><p class="card-desc">午休结束时间同时作为下午上班时间</p></div>
+          <label class="switch"><input id="countdownEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="time-grid">
+          <div class="field"><label for="lunchStart">午休开始</label><input id="lunchStart" type="time"></div>
+          <div class="field"><label for="lunchEnd">午休结束</label><input id="lunchEnd" type="time"></div>
+          <div class="field"><label for="workEnd">下班时间</label><input id="workEnd" type="time"></div>
+        </div>
+        <div class="countdowns">
+          <div class="metric"><div class="metric-label">距离午休</div><div class="metric-value" id="lunchCountdown">--:--:--</div><div class="metric-note" id="lunchNote">等待配置</div></div>
+          <div class="metric"><div class="metric-label">距离下班</div><div class="metric-value" id="workCountdown">--:--:--</div><div class="metric-note" id="workNote">等待配置</div></div>
+        </div>
+      </article>
+
+      <article class="card full" id="salaryCard">
+        <div class="card-head">
+          <div><h2 class="card-title">薪资计算器</h2><p class="card-desc">中国大陆居民工资薪金月度预扣估算</p></div>
+          <label class="switch"><input id="salaryEnabled" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="salary-inputs">
+          <div class="field"><label for="monthlySalary">税前月薪</label><div class="input-wrap"><input id="monthlySalary" type="number" min="0" step="100"><span class="suffix">元</span></div></div>
+          <div class="field"><label for="fundBase">公积金基数</label><div class="input-wrap"><input id="fundBase" type="number" min="0" step="100"><span class="suffix">元</span></div></div>
+          <div class="field"><label for="fundRate">公积金个人比例</label><div class="input-wrap"><input id="fundRate" type="number" min="0" max="100" step="0.1"><span class="suffix">%</span></div></div>
+          <div class="field"><label for="socialSecurity">社保个人合计</label><div class="input-wrap"><input id="socialSecurity" type="number" min="0" step="10"><span class="suffix">元</span></div></div>
+          <div class="field"><label for="expectedDays">应出勤天数</label><div class="input-wrap"><input id="expectedDays" type="number" min="0" max="31" step="0.5"><span class="suffix">天</span></div></div>
+          <div class="field"><label for="actualDays">实际出勤天数</label><div class="input-wrap"><input id="actualDays" type="number" min="0" max="31" step="0.5"><span class="suffix">天</span></div></div>
+          <div class="field"><label for="monthlyAllowance">月度补贴</label><div class="input-wrap"><input id="monthlyAllowance" type="number" min="0" step="10"><span class="suffix">元</span></div></div>
+          <div class="field"><label for="workStart">上班时间</label><input id="workStart" type="time"></div>
+        </div>
+        <div class="results">
+          <div class="result"><div class="name">21.75 标准日薪</div><div class="value" id="dailySalary">¥0.00</div></div>
+          <div class="result"><div class="name">标准时薪</div><div class="value" id="hourlySalary">¥0.00</div></div>
+          <div class="result"><div class="name">缺勤扣款</div><div class="value" id="absenceDeduction">¥0.00</div></div>
+          <div class="result"><div class="name">公积金个人扣除</div><div class="value" id="fundDeduction">¥0.00</div></div>
+          <div class="result"><div class="name">本月个税估算</div><div class="value" id="incomeTax">¥0.00</div></div>
+          <div class="result primary"><div class="name">预计到手工资</div><div class="value" id="netSalary">¥0.00</div></div>
+        </div>
+        <p class="formula-note">说明：时薪按每日 8 小时；个税采用月度换算税率表、5000 元基本减除费用，未计专项附加扣除及累计预扣差异，结果仅供估算。</p>
+      </article>
+    </section>
+    <footer class="footer">关闭或最小化窗口后程序继续在系统托盘运行 · 配置自动保存在本机 localStorage</footer>
+  </main>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const STORAGE_KEY = 'workday-companion-config-v1';
+    const defaults = {
+      sedentaryEnabled: true,
+      sedentaryInterval: 60,
+      waterEnabled: true,
+      waterInterval: 45,
+      countdownEnabled: true,
+      earningsEnabled: true,
+      salaryEnabled: true,
+      lunchStart: '12:00',
+      lunchEnd: '13:30',
+      workStart: '09:00',
+      workEnd: '18:00',
+      monthlySalary: 10000,
+      fundBase: 10000,
+      fundRate: 12,
+      socialSecurity: 1050,
+      expectedDays: 22,
+      actualDays: 22,
+      monthlyAllowance: 0,
+      reminderNextAt: { sedentary: 0, water: 0 }
+    };
+
+    const ids = [
+      'sedentaryEnabled', 'sedentaryInterval', 'waterEnabled', 'waterInterval',
+      'countdownEnabled', 'earningsEnabled', 'salaryEnabled', 'lunchStart', 'lunchEnd',
+      'workStart', 'workEnd', 'monthlySalary', 'fundBase', 'fundRate', 'socialSecurity',
+      'expectedDays', 'actualDays', 'monthlyAllowance'
+    ];
+    const checkboxIds = new Set(['sedentaryEnabled', 'waterEnabled', 'countdownEnabled', 'earningsEnabled', 'salaryEnabled']);
+    let config = loadConfig();
+
+    function loadConfig() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        return { ...defaults, ...saved, reminderNextAt: { ...defaults.reminderNextAt, ...(saved.reminderNextAt || {}) } };
+      } catch (_error) {
+        return { ...defaults, reminderNextAt: { ...defaults.reminderNextAt } };
+      }
+    }
+
+    function saveConfig() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    }
+
+    function readForm() {
+      ids.forEach((id) => {
+        const input = document.getElementById(id);
+        config[id] = checkboxIds.has(id) ? input.checked : input.value;
+      });
+    }
+
+    function fillForm() {
+      ids.forEach((id) => {
+        const input = document.getElementById(id);
+        if (checkboxIds.has(id)) input.checked = Boolean(config[id]);
+        else input.value = config[id];
+      });
+    }
+
+    function numberValue(key) {
+      const value = Number(config[key]);
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    }
+
+    function currency(value) {
+      return `¥${Math.max(0, Number(value) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function timeParts(value) {
+      const match = /^(\d{1,2}):(\d{2})$/.exec(value || '');
+      return match ? { hour: Number(match[1]), minute: Number(match[2]) } : null;
+    }
+
+    function atTime(now, value) {
+      const parts = timeParts(value);
+      if (!parts) return null;
+      const date = new Date(now);
+      date.setHours(parts.hour, parts.minute, 0, 0);
+      return date;
+    }
+
+    function duration(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000));
+      const hours = String(Math.floor(total / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+      const seconds = String(total % 60).padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    function isWorkday(date) {
+      const day = date.getDay();
+      return day >= 1 && day <= 5;
+    }
+
+    function salaryResults() {
+      const monthlySalary = numberValue('monthlySalary');
+      const allowance = numberValue('monthlyAllowance');
+      const daily = monthlySalary / 21.75;
+      const hourly = daily / 8;
+      const absentDays = Math.max(0, numberValue('expectedDays') - numberValue('actualDays'));
+      const absence = daily * absentDays;
+      const fund = numberValue('fundBase') * Math.min(numberValue('fundRate'), 100) / 100;
+      const social = numberValue('socialSecurity');
+      const taxable = Math.max(0, monthlySalary + allowance - absence - fund - social - 5000);
+      let rate = 0;
+      let quickDeduction = 0;
+
+      if (taxable <= 3000) [rate, quickDeduction] = [0.03, 0];
+      else if (taxable <= 12000) [rate, quickDeduction] = [0.10, 210];
+      else if (taxable <= 25000) [rate, quickDeduction] = [0.20, 1410];
+      else if (taxable <= 35000) [rate, quickDeduction] = [0.25, 2660];
+      else if (taxable <= 55000) [rate, quickDeduction] = [0.30, 4410];
+      else if (taxable <= 80000) [rate, quickDeduction] = [0.35, 7160];
+      else [rate, quickDeduction] = [0.45, 15160];
+
+      const tax = Math.max(0, taxable * rate - quickDeduction);
+      const net = monthlySalary + allowance - absence - fund - social - tax;
+      return { daily, hourly, absence, fund, tax, net: Math.max(0, net) };
+    }
+
+    function calculateSalary() {
+      const result = salaryResults();
+      document.getElementById('dailySalary').textContent = currency(result.daily);
+      document.getElementById('hourlySalary').textContent = currency(result.hourly);
+      document.getElementById('absenceDeduction').textContent = currency(result.absence);
+      document.getElementById('fundDeduction').textContent = currency(result.fund);
+      document.getElementById('incomeTax').textContent = currency(result.tax);
+      document.getElementById('netSalary').textContent = currency(result.net);
+    }
+
+    function workSegments(now) {
+      const start = atTime(now, config.workStart);
+      const lunchStart = atTime(now, config.lunchStart);
+      const lunchEnd = atTime(now, config.lunchEnd);
+      const end = atTime(now, config.workEnd);
+      if (!start || !lunchStart || !lunchEnd || !end) return [];
+      if (!(start < lunchStart && lunchStart <= lunchEnd && lunchEnd < end)) return [];
+      return [[start, lunchStart], [lunchEnd, end]];
+    }
+
+    function updateEarnings(now) {
+      const state = document.getElementById('earningState');
+      const money = document.getElementById('earnedMoney');
+      const progress = document.getElementById('earningProgress');
+      if (!config.earningsEnabled) {
+        money.textContent = '¥0.00';
+        state.textContent = '模块未启用';
+        state.classList.remove('active');
+        progress.style.width = '0%';
+        return;
+      }
+
+      const segments = workSegments(now);
+      const totalMs = segments.reduce((sum, [start, end]) => sum + (end - start), 0);
+      let elapsedMs = 0;
+      segments.forEach(([start, end]) => {
+        elapsedMs += Math.max(0, Math.min(now, end) - start);
+      });
+      if (!isWorkday(now)) elapsedMs = 0;
+
+      const result = salaryResults();
+      const earned = result.hourly * elapsedMs / 3600000;
+      money.textContent = currency(earned);
+      progress.style.width = `${totalMs ? Math.min(100, elapsedMs / totalMs * 100) : 0}%`;
+
+      const inActiveSegment = isWorkday(now) && segments.some(([start, end]) => now >= start && now < end);
+      state.classList.toggle('active', inActiveSegment);
+      if (!isWorkday(now)) state.textContent = '今天是周末，收益暂停';
+      else if (!segments.length) state.textContent = '请检查上班与午休时间配置';
+      else if (inActiveSegment) state.textContent = `正在累计 · ${currency(result.hourly)}/小时`;
+      else if (now < segments[0][0]) state.textContent = '尚未到上班时间';
+      else if (now >= segments[0][1] && now < segments[1][0]) state.textContent = '午休中，收益暂停';
+      else state.textContent = '已下班，今日收益停止';
+    }
+
+    function updateCountdowns(now) {
+      const lunchValue = document.getElementById('lunchCountdown');
+      const lunchNote = document.getElementById('lunchNote');
+      const workValue = document.getElementById('workCountdown');
+      const workNote = document.getElementById('workNote');
+      if (!config.countdownEnabled) {
+        lunchValue.textContent = workValue.textContent = '--:--:--';
+        lunchNote.textContent = workNote.textContent = '模块未启用';
+        return;
+      }
+
+      const lunchStart = atTime(now, config.lunchStart);
+      const lunchEnd = atTime(now, config.lunchEnd);
+      const workEnd = atTime(now, config.workEnd);
+      if (!lunchStart || !lunchEnd || !workEnd) return;
+
+      if (!isWorkday(now)) {
+        lunchValue.textContent = workValue.textContent = '--:--:--';
+        lunchNote.textContent = workNote.textContent = '今天是周末';
+      } else {
+        if (now < lunchStart) {
+          lunchValue.textContent = duration(lunchStart - now);
+          lunchNote.textContent = `${config.lunchStart} 开始午休`;
+        } else if (now < lunchEnd) {
+          lunchValue.textContent = duration(lunchEnd - now);
+          lunchNote.textContent = `午休中 · ${config.lunchEnd} 恢复工作`;
+        } else {
+          lunchValue.textContent = '00:00:00';
+          lunchNote.textContent = '今日午休已结束';
+        }
+
+        if (now < workEnd) {
+          workValue.textContent = duration(workEnd - now);
+          workNote.textContent = `${config.workEnd} 下班`;
+        } else {
+          workValue.textContent = '00:00:00';
+          workNote.textContent = '今天辛苦了，已下班';
+        }
+      }
+    }
+
+    function reminderPayload() {
+      return {
+        sedentary: {
+          enabled: config.sedentaryEnabled,
+          intervalMinutes: Math.max(1, numberValue('sedentaryInterval')),
+          nextAt: config.reminderNextAt.sedentary
+        },
+        water: {
+          enabled: config.waterEnabled,
+          intervalMinutes: Math.max(1, numberValue('waterInterval')),
+          nextAt: config.reminderNextAt.water
+        }
+      };
+    }
+
+    function resetReminder(type) {
+      const enabledKey = `${type}Enabled`;
+      const intervalKey = `${type}Interval`;
+      config.reminderNextAt[type] = config[enabledKey]
+        ? Date.now() + Math.max(1, numberValue(intervalKey)) * 60000
+        : 0;
+      ipcRenderer.send('set-reminder-state', reminderPayload());
+    }
+
+    function updateReminderLabels(now) {
+      ['sedentary', 'water'].forEach((type) => {
+        const target = document.getElementById(`${type}Next`);
+        if (!config[`${type}Enabled`]) target.textContent = '未启用';
+        else if (!config.reminderNextAt[type]) target.textContent = '正在初始化';
+        else target.textContent = duration(config.reminderNextAt[type] - now);
+      });
+    }
+
+    function updateModuleStates() {
+      document.getElementById('sedentaryCard').classList.toggle('disabled-module', !config.sedentaryEnabled);
+      document.getElementById('waterCard').classList.toggle('disabled-module', !config.waterEnabled);
+      document.getElementById('countdownCard').classList.toggle('disabled-module', !config.countdownEnabled);
+      document.getElementById('earningsCard').classList.toggle('disabled-module', !config.earningsEnabled);
+      document.getElementById('salaryCard').classList.toggle('disabled-module', !config.salaryEnabled);
+    }
+
+    function refresh() {
+      const now = new Date();
+      document.getElementById('todayText').textContent = now.toLocaleDateString('zh-CN', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+      }) + (isWorkday(now) ? ' · 工作日' : ' · 周末');
+      calculateSalary();
+      updateCountdowns(now);
+      updateEarnings(now);
+      updateReminderLabels(now);
+      updateModuleStates();
+    }
+
+    function handleChange(event) {
+      const id = event.target.id;
+      readForm();
+      if (id === 'sedentaryEnabled' || id === 'sedentaryInterval') resetReminder('sedentary');
+      if (id === 'waterEnabled' || id === 'waterInterval') resetReminder('water');
+      saveConfig();
+      refresh();
+    }
+
+    fillForm();
+    ids.forEach((id) => document.getElementById(id).addEventListener('change', handleChange));
+    document.querySelectorAll('[data-test]').forEach((button) => {
+      button.addEventListener('click', () => ipcRenderer.invoke('show-test-notification', button.dataset.test));
+    });
+
+    if (config.sedentaryEnabled && !config.reminderNextAt.sedentary) resetReminder('sedentary');
+    if (config.waterEnabled && !config.reminderNextAt.water) resetReminder('water');
+    ipcRenderer.send('set-reminder-state', reminderPayload());
+
+    ipcRenderer.on('reminder-state-updated', (_event, state) => {
+      config.reminderNextAt.sedentary = state.sedentary.nextAt;
+      config.reminderNextAt.water = state.water.nextAt;
+      saveConfig();
+      updateReminderLabels(new Date());
+    });
+
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>
