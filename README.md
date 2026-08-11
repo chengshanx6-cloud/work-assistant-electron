@@ -15,6 +15,14 @@
 - 💳 发薪日倒计时、今日与本月工作统计
 - 🎨 简洁暗色界面
 
+## 效果图
+<p align="center">
+<img src="./assets/preview1.png" width="780"/>
+</p>
+<p align="center">
+<img src="./assets/preview2.png" width="780"/>
+</p>
+
 ## 环境要求
 
 - Windows 10/11
